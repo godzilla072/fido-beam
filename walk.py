@@ -1,4 +1,4 @@
-from math import sin, cos
+from math import sin, cos, pi
 from pylx16a.lx16a import *
 import time
 from datetime import datetime
@@ -14,13 +14,13 @@ LX16A.initialize("/dev/cu.usbserial-120", 0.1)  # macOS
 SERVOS = {
     1: {"name": "Back Left Bottom", "min_angle": 160.0, "max_angle": 190.0},
     2: {"name": "Back Left Top", "min_angle": 100.0, "max_angle": 160.0},  # 100, 160
-    
-    3: {"name": "Front Left Bottom", "min_angle": 170.0, "max_angle": 200.0}, # 170, 200
-    4: {"name": "Front Left Top", "min_angle": 120.0, "max_angle": 180.0},  # + cc 110, 170
-    
+
+    3: {"name": "Front Left Bottom", "min_angle": 170.0, "max_angle": 200.0},  # 170, 200
+    4: {"name": "Front Left Top", "min_angle": 120.0, "max_angle": 180.0},  # 120, 180
+
     5: {"name": "Front Right Bottom", "min_angle": 150.0, "max_angle": 180.0},
     6: {"name": "Front Right Top", "min_angle": 80.0, "max_angle": 140.0},
-    
+
     7: {"name": "Back Right Bottom", "min_angle": 140.0, "max_angle": 170.0},
     8: {"name": "Back Right Top", "min_angle": 60.0, "max_angle": 120.0},  # Decrease, lowers leg
 }
@@ -82,8 +82,8 @@ def homing_sequence():
 def walk(stop_event):
     """Simulate a walking gait by moving servos periodically."""
     print("Starting walking loop. Press Ctrl+C to stop and return to homing.")
-    time_variables = {servo_id: 0 for servo_id in SERVOS.keys()}  # Initialize time variables
-
+    t = 0  # Initialize global time variable
+    delta_t = 0.1  # Time increment
     while not stop_event.is_set():
         for servo_id, config in SERVOS.items():
             if stop_event.is_set():
@@ -92,7 +92,14 @@ def walk(stop_event):
                 min_angle = config["min_angle"]
                 max_angle = config["max_angle"]
                 servo = config["servo"]
-                time_var = time_variables[servo_id]
+
+                # Determine the time variable for this servo
+                # Group A: Front Left (IDs 3 and 4), Back Right (IDs 7 and 8)
+                # Group B: Front Right (IDs 5 and 6), Back Left (IDs 1 and 2)
+                if servo_id in [3, 4, 7, 8]:  # Group A
+                    time_var = t
+                else:  # Group B
+                    time_var = t + pi  # Phase shift by pi radians
 
                 # Calculate angles using sine for bottom servos and cosine for top servos
                 if "Bottom" in config["name"]:
@@ -109,22 +116,19 @@ def walk(stop_event):
                 # Log the movement
                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                 print(f"[{current_time}] Servo {servo_id} ({config['name']}) moved to {clamped_angle}°")
-
-                # Update the time variable
-                time_variables[servo_id] += 0.1
             except Exception as e:
                 print(f"Failed to move Servo {servo_id} ({config['name']}): {e}. Exiting...")
                 stop_event.set()
                 break
 
+        # Increment the global time variable
+        t += delta_t
         # Sleep to control the loop frequency
         time.sleep(0.2)
 
 def main():
     boot_sequence()
     homing_sequence()
-
-    return
 
     # Create a threading.Event to signal stopping
     stop_event = threading.Event()
@@ -145,4 +149,4 @@ def main():
     print("Program terminated gracefully.")
 
 if __name__ == "__main__":
-        main()
+    main()
