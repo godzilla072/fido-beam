@@ -8,7 +8,6 @@ This library requires a Python version >= 3.10. You can install using pip:
 
 ```
 python3 -m pip install pylx16a
-pip install pynput
 ```
 
 ```
@@ -16,7 +15,6 @@ ndhillon@neils-air PyLX-16A % python3 -m venv .
 ndhillon@neils-air PyLX-16A % source ./bin/activate
 
 (PyLX-16A) ndhillon@neils-air PyLX-16A % python3 -m pip install pylx16a
-pip install pynput
 ```
 
 ```

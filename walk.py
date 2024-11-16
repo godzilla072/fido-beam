@@ -13,10 +13,10 @@ LX16A.initialize("/dev/cu.usbserial-120", 0.1)  # macOS
 # one may have a slightly different offset to achieve the same radial range of motion.
 SERVOS = {
     1: {"name": "Back Left Bottom", "min_angle": 160.0, "max_angle": 190.0},
-    2: {"name": "Back Left Top", "min_angle": 100.0, "max_angle": 160.0},
+    2: {"name": "Back Left Top", "min_angle": 100.0, "max_angle": 160.0},  # 100, 160
     
-    3: {"name": "Front Left Bottom", "min_angle": 170.0, "max_angle": 200.0},
-    4: {"name": "Front Left Top", "min_angle": 110.0, "max_angle": 170.0},
+    3: {"name": "Front Left Bottom", "min_angle": 170.0, "max_angle": 200.0}, # 170, 200
+    4: {"name": "Front Left Top", "min_angle": 120.0, "max_angle": 180.0},  # + cc 110, 170
     
     5: {"name": "Front Right Bottom", "min_angle": 150.0, "max_angle": 180.0},
     6: {"name": "Front Right Top", "min_angle": 80.0, "max_angle": 140.0},
@@ -123,6 +123,8 @@ def walk(stop_event):
 def main():
     boot_sequence()
     homing_sequence()
+
+    return
 
     # Create a threading.Event to signal stopping
     stop_event = threading.Event()
