@@ -1,0 +1,21 @@
+Metadata-Version: 2.1
+Name: pylx16a
+Version: 1.1.1
+Summary: A modern Python library for controlling HiWonder's LX-16A servos
+Home-page: https://github.com/ethanlipson/PyLX-16A
+Author: Ethan Lipson
+Author-email: ethan.lipson@gmail.com
+License: UNKNOWN
+Project-URL: Bug Tracker, https://github.com/ethanlipson/PyLX-16A/issues
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pyserial
+Requires-Dist: pyqt6
+
+UNKNOWN
+
