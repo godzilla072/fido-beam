@@ -4,26 +4,39 @@ import time
 from datetime import datetime
 import serial.serialutil
 import threading
+import sys
 
 # Initialize the servo connection
 LX16A.initialize("/dev/cu.usbserial-130", 0.1)  # macOS
 
 # Servo configuration: ID and angle limits
-# Note: The servo horns were installed without zeroing the servo, therefore each
-# one may have a slightly different offset to achieve the same radial range of motion.
+# Note: Adjust 'swing_backward', 'swing_forward', 'lift_down', and 'lift_up' as per your robot's design
 SERVOS = {
-    1: {"name": "Back Left Bottom", "min_angle": 140.0, "max_angle": 190.0}, # A: as going to 140 is down
-    2: {"name": "Back Left Top", "min_angle": 130.0, "max_angle": 130.0},
+    1: {"name": "Back Left Bottom", "min_angle": 160.0, "max_angle": 210.0, "swing_backward": 210.0, "swing_forward": 160.0},
+    2: {"name": "Back Left Top", "min_angle": 129.0, "max_angle": 135.0, "lift_down": 130.0, "lift_up": 130.0}, # Push down
 
-    3: {"name": "Front Left Bottom", "min_angle": 150.0, "max_angle": 200.0},  #  170 is down (clock-wise)
-    4: {"name": "Front Left Top", "min_angle": 150.0, "max_angle": 150.0},
+    3: {"name": "Front Left Bottom", "min_angle": 150.0, "max_angle": 200.0, "swing_backward": 150.0, "swing_forward": 200.0},
+    4: {"name": "Front Left Top", "min_angle": 159.0, "max_angle": 165.0, "lift_down": 160.0, "lift_up": 160.0},
 
-    5: {"name": "Front Right Bottom", "min_angle": 150.0, "max_angle": 200.0}, # A: increasing to 200 is bottom
-    6: {"name": "Front Right Top", "min_angle": 110.0, "max_angle": 110.0},
+    5: {"name": "Front Right Bottom", "min_angle": 150.0, "max_angle": 205.0, "swing_backward": 200.0, "swing_forward": 150.0},
+    6: {"name": "Front Right Top", "min_angle": 95.0, "max_angle": 100.0, "lift_down": 100.0, "lift_up": 100.0}, # lower is down
 
-    7: {"name": "Back Right Bottom", "min_angle": 140.0, "max_angle": 190.0}, # 190 is bottom
-    8: {"name": "Back Right Top", "min_angle": 90.0, "max_angle": 90.0},    
+    7: {"name": "Back Right Bottom", "min_angle": 130.0, "max_angle": 180.0, "swing_backward": 180.0, "swing_forward": 130.0},
+    8: {"name": "Back Right Top", "min_angle": 69.0, "max_angle": 75.0, "lift_down": 70.0, "lift_up": 70.0},  # Push down, lower number
 }
+
+GROUP_A = [3, 4, 7, 8]  # Front Left and Front Right
+GROUP_B = [1, 2, 5, 6]  # Back Left and Back Right
+
+# Define custom exceptions if they are not part of pylx16a
+# If pylx16a.lx16a already defines these, you can remove these definitions
+class ServoTimeoutError(Exception):
+    def __init__(self, id_):
+        self.id_ = id_
+        super().__init__(f"Servo {id_} timed out.")
+
+class ServoChecksumError(Exception):
+    pass
 
 # A decorator to handle errors gracefully
 def handle_disconnection(func):
@@ -31,17 +44,33 @@ def handle_disconnection(func):
         try:
             return func(*args, **kwargs)
         except ServoTimeoutError as e:
-            print(f"Servo {e.id_} is not responding. Exiting...")
-            quit()
+            print(f"Servo {e.id_} is not responding.")
+            if threading.current_thread() == threading.main_thread():
+                print("Exiting program due to servo timeout.")
+                quit()
+            else:
+                print("Exiting thread due to servo timeout.")
         except ServoChecksumError:
-            print("Checksum error occurred while communicating with a servo. Exiting...")
-            quit()
+            print("Checksum error occurred while communicating with a servo.")
+            if threading.current_thread() == threading.main_thread():
+                print("Exiting program due to checksum error.")
+                quit()
+            else:
+                print("Exiting thread due to checksum error.")
         except serial.serialutil.SerialException:
-            print("Serial port error. The motor might be disconnected. Exiting...")
-            quit()
+            print("Serial port error. The motor might be disconnected.")
+            if threading.current_thread() == threading.main_thread():
+                print("Exiting program due to serial port error.")
+                quit()
+            else:
+                print("Exiting thread due to serial port error.")
         except Exception as e:
-            print(f"An unexpected error occurred: {str(e)}. Exiting...")
-            quit()
+            print(f"An unexpected error occurred: {str(e)}.")
+            if threading.current_thread() == threading.main_thread():
+                print("Exiting program due to unexpected error.")
+                quit()
+            else:
+                print("Exiting thread due to unexpected error.")
     return wrapper
 
 @handle_disconnection
@@ -61,7 +90,7 @@ def boot_sequence():
                   f"{actual_min_angle}° to {actual_max_angle}°")
         except Exception as e:
             print(f"Failed to initialize Servo {servo_id} ({config['name']}): {e}. Exiting...")
-            quit()
+            raise  # Let the decorator handle the exception
 
 @handle_disconnection
 def homing_sequence():
@@ -69,13 +98,16 @@ def homing_sequence():
     print("Starting homing sequence...")
     for servo_id, config in SERVOS.items():
         try:
-            neutral_angle = (config["min_angle"] + config["max_angle"]) / 2
+            if "Bottom" in config["name"]:
+                neutral_angle = (config["swing_backward"] + config["swing_forward"]) / 2
+            else:
+                neutral_angle = config["lift_down"]  # Legs down in neutral position
             config["servo"].move(neutral_angle)
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
             print(f"[{current_time}] Servo {servo_id} ({config['name']}) set to neutral position: {neutral_angle}°")
         except Exception as e:
             print(f"Failed to home Servo {servo_id} ({config['name']}): {e}. Exiting...")
-            quit()
+            raise  # Let the decorator handle the exception
     print("Homing sequence completed.")
 
 def generate_angles(start, stop, step):
@@ -97,56 +129,95 @@ def generate_angles(start, stop, step):
             current += step
 
 @handle_disconnection
-def walk(stop_event):
-    """Simulate a walking gait by moving servos periodically."""
-    print("Starting walking loop. Press Ctrl+C to stop and return to homing.")
-    t = 0  # Initialize global time variable
-    delta_t = 0.1  # Time increment
-    step_size = 5.0  # Degrees to move in each step
-    delay = 0.5  # Seconds between steps for fine-tuning
+def lift_legs(group):
+    """Lift the legs in the specified group."""
+    for servo_id in group:
+        config = SERVOS[servo_id]
+        if "Top" in config["name"]:
+            servo = config["servo"]
+            lift_up_angle = config["lift_up"]
+            servo.move(lift_up_angle)
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            print(f"[{current_time}] Servo {servo_id} ({config['name']}) lifted to {lift_up_angle}°")
 
-    while not stop_event.is_set():
-        for servo_id, config in SERVOS.items():
-            if stop_event.is_set():
-                break  # Exit early if stop_event is set during servo movements
-            try:
-                min_angle = config["min_angle"]
-                max_angle = config["max_angle"]
+@handle_disconnection
+def lower_legs(group):
+    """Lower the legs in the specified group."""
+    for servo_id in group:
+        config = SERVOS[servo_id]
+        if "Top" in config["name"]:
+            servo = config["servo"]
+            lift_down_angle = config["lift_down"]
+            servo.move(lift_down_angle)
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            print(f"[{current_time}] Servo {servo_id} ({config['name']}) lowered to {lift_down_angle}°")
+
+@handle_disconnection
+def swing_legs_forward(group, step_size, delay):
+    """Swing the legs forward in the specified group."""
+    angle_sequences = {}
+    max_steps = 0
+
+    # Generate angle sequences for each servo
+    for servo_id in group:
+        config = SERVOS[servo_id]
+        if "Bottom" in config["name"]:
+            swing_backward_angle = config["swing_backward"]
+            swing_forward_angle = config["swing_forward"]
+            if swing_backward_angle < swing_forward_angle:
+                step = step_size
+            else:
+                step = -step_size
+            angle_sequence = list(generate_angles(swing_backward_angle, swing_forward_angle, step))
+            angle_sequences[servo_id] = angle_sequence
+            if len(angle_sequence) > max_steps:
+                max_steps = len(angle_sequence)
+
+    # Move servos step by step
+    for step in range(max_steps):
+        for servo_id, angles in angle_sequences.items():
+            if step < len(angles):
+                angle = angles[step]
+                config = SERVOS[servo_id]
                 servo = config["servo"]
-
-                # Determine the time variable for this servo
-                # Group A: Front Left (IDs 3 and 4), Front Right (IDs 5 and 6)
-                # Group B: Back Left (IDs 1 and 2), Back Right (IDs 7 and 8)
-                # Note: Due to orientation clockwise on one side is counter-clockwise on the other.
-                if servo_id in [3, 4, 5, 6]:  # Group A
-                    time_var = t
-                else:  # Group B
-                    time_var = t + pi  # Phase shift by pi radians
-
-                # Calculate angles using sine for bottom servos and cosine for top servos
-                if "Bottom" in config["name"]:
-                    raw_angle = (sin(time_var) * 0.5 + 0.5) * (max_angle - min_angle) + min_angle
-                else:
-                    raw_angle = (cos(time_var) * 0.5 + 0.5) * (max_angle - min_angle) + min_angle
-
-                # Clamp the angle to ensure it's within [min_angle, max_angle]
-                clamped_angle = max(min_angle, min(raw_angle, max_angle))
-
-                # Move the servo to the clamped angle
-                servo.move(clamped_angle)
-
-                # Log the movement
+                servo.move(angle)
                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-                print(f"[{current_time}] Servo {servo_id} ({config['name']}) moved to {clamped_angle}°")
-            except Exception as e:
-                print(f"Failed to move Servo {servo_id} ({config['name']}): {e}. Exiting...")
-                stop_event.set()
-                break
+                print(f"[{current_time}] Servo {servo_id} ({config['name']}) moved to {angle}°")
+        time.sleep(delay)
 
-        # Increment the global time variable
-        t += delta_t
-        # Sleep to control the loop frequency
-        time.sleep(0.2)  # TODO: Lower this value to increase speed
+@handle_disconnection
+def walk(stop_event):
+    """Simulate walking by moving groups alternately."""
+    print("Starting walking loop. Press Ctrl+C to stop and return to homing.")
+    step_size = 5.0  # Degrees to move in each step
+    delay = 0.2  # Seconds between steps
+
+    try:
+        while not stop_event.is_set():
+            # Move Group A
+            if stop_event.is_set():
+                break
+            print("Group A is moving")
+            lift_legs(GROUP_A)
+            swing_legs_forward(GROUP_A, step_size, delay)
+            lower_legs(GROUP_A)
+
+            # Wait briefly
+            time.sleep(1.5)
+
+            # Move Group B
+            if stop_event.is_set():
+                break
+            print("Group B is moving")
+            lift_legs(GROUP_B)
+            swing_legs_forward(GROUP_B, step_size, delay)
+            lower_legs(GROUP_B)
+
+            # Wait briefly
+            time.sleep(1.5)
+    except Exception as e:
+        print(f"Error in walk function: {e}")
+        # Do not call quit() here; the decorator handles it based on the thread
 
 @handle_disconnection
 def fine_tune_front_left_leg(stop_event):
@@ -159,11 +230,11 @@ def fine_tune_front_left_leg(stop_event):
     lift_angle_bottom = SERVOS[3]["max_angle"]  # Maximum angle to lift
     lower_angle_bottom = ceil(SERVOS[3]["min_angle"])  # Minimum angle to lower, rounded up to avoid exceeding
 
-    lift_angle_top = SERVOS[4]["max_angle"]     # Maximum angle to lift
-    lower_angle_top = SERVOS[4]["min_angle"]    # Minimum angle to lower
+    lift_angle_top = SERVOS[4]["lift_up"]     # Maximum angle to lift
+    lower_angle_top = SERVOS[4]["lift_down"]    # Minimum angle to lower
 
     step = 5.0  # Degrees to move in each step
-    delay = 0.5  # Seconds between steps
+    delay_time = 0.5  # Seconds between steps
 
     try:
         while not stop_event.is_set():
@@ -189,7 +260,7 @@ def fine_tune_front_left_leg(stop_event):
                     stop_event.set()
                     break
 
-                time.sleep(delay)
+                time.sleep(delay_time)
 
             if stop_event.is_set():
                 break
@@ -216,7 +287,7 @@ def fine_tune_front_left_leg(stop_event):
                     stop_event.set()
                     break
 
-                time.sleep(delay)
+                time.sleep(delay_time)
 
     except Exception as e:
         print(f"Error during fine-tuning: {e}. Exiting fine-tune mode.")
@@ -231,7 +302,15 @@ def main():
         print("1. Start Walking")
         print("2. Fine-Tune Front Left Leg")
         print("3. Exit")
-        choice = input("Enter your choice (1/2/3): ").strip()
+        try:
+            choice = input("Enter your choice (1/2/3): ").strip()
+        except EOFError:
+            print("\nEOF detected. Exiting program.")
+            homing_sequence()
+            break
+        except ValueError as ve:
+            print(f"Input error: {ve}. Please try again.")
+            continue
 
         if choice == '1':
             # Create a threading.Event to signal stopping
