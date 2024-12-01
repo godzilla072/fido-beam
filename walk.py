@@ -12,21 +12,21 @@ LX16A.initialize("/dev/cu.usbserial-130", 0.1)  # macOS
 # Servo configuration: ID and angle limits
 # Note: Adjust 'swing_backward', 'swing_forward', 'lift_down', and 'lift_up' as per your robot's design
 SERVOS = {
-    1: {"name": "Back Left Bottom", "min_angle": 160.0, "max_angle": 210.0, "swing_backward": 210.0, "swing_forward": 160.0},
-    2: {"name": "Back Left Top", "min_angle": 129.0, "max_angle": 135.0, "lift_down": 130.0, "lift_up": 130.0}, # Push down
+    1: {"name": "Back Left Bottom", "min_angle": 159.0, "max_angle": 210.0, "swing_backward": 210.0, "swing_forward": 160.0},
+    2: {"name": "Back Left Top", "min_angle": 129.0, "max_angle": 135.0, "lift_down": 130.0, "lift_up": 135.0},  # Updated lift_up
 
-    3: {"name": "Front Left Bottom", "min_angle": 150.0, "max_angle": 200.0, "swing_backward": 150.0, "swing_forward": 200.0},
-    4: {"name": "Front Left Top", "min_angle": 159.0, "max_angle": 165.0, "lift_down": 160.0, "lift_up": 160.0},
+    3: {"name": "Front Left Bottom", "min_angle": 150.0, "max_angle": 201.0, "swing_backward": 150.0, "swing_forward": 200.0},
+    4: {"name": "Front Left Top", "min_angle": 159.0, "max_angle": 165.0, "lift_down": 160.0, "lift_up": 165.0},    # Updated lift_up
 
-    5: {"name": "Front Right Bottom", "min_angle": 150.0, "max_angle": 205.0, "swing_backward": 200.0, "swing_forward": 150.0},
-    6: {"name": "Front Right Top", "min_angle": 95.0, "max_angle": 100.0, "lift_down": 100.0, "lift_up": 100.0}, # lower is down
+    5: {"name": "Front Right Bottom", "min_angle": 150.0, "max_angle": 205.0, "swing_backward": 150.0, "swing_forward": 200.0},  # Corrected swing_forward
+    6: {"name": "Front Right Top", "min_angle": 95.0, "max_angle": 105.0, "lift_down": 100.0, "lift_up": 105.0},  # Updated lift_up
 
     7: {"name": "Back Right Bottom", "min_angle": 130.0, "max_angle": 180.0, "swing_backward": 180.0, "swing_forward": 130.0},
-    8: {"name": "Back Right Top", "min_angle": 69.0, "max_angle": 75.0, "lift_down": 70.0, "lift_up": 70.0},  # Push down, lower number
+    8: {"name": "Back Right Top", "min_angle": 69.0, "max_angle": 75.0, "lift_down": 70.0, "lift_up": 75.0},      # Updated lift_up
 }
 
-GROUP_A = [3, 4, 7, 8]  # Front Left and Front Right
-GROUP_B = [1, 2, 5, 6]  # Back Left and Back Right
+GROUP_A = [3, 4, 7, 8]  # Front Left and Back Right
+GROUP_B = [1, 2, 5, 6]  # Back Left and Front Right
 
 # Define custom exceptions if they are not part of pylx16a
 # If pylx16a.lx16a already defines these, you can remove these definitions
@@ -293,6 +293,52 @@ def fine_tune_front_left_leg(stop_event):
         print(f"Error during fine-tuning: {e}. Exiting fine-tune mode.")
         stop_event.set()
 
+@handle_disconnection
+def walk_step_by_step():
+    """Animate walking process one leg at a time with pauses."""
+    print("\nStarting step-by-step walking mode. Press Enter to proceed after each movement.")
+
+    # Define the legs and their servos
+    legs = [
+        {'name': 'Front Left', 'top_servo_id': 4, 'bottom_servo_id': 3},
+        {'name': 'Front Right', 'top_servo_id': 6, 'bottom_servo_id': 5},
+        {'name': 'Back Left', 'top_servo_id': 2, 'bottom_servo_id': 1},
+        {'name': 'Back Right', 'top_servo_id': 8, 'bottom_servo_id': 7},
+    ]
+
+    for leg in legs:
+        leg_name = leg['name']
+        top_servo_id = leg['top_servo_id']
+        bottom_servo_id = leg['bottom_servo_id']
+
+        top_servo = SERVOS[top_servo_id]['servo']
+        bottom_servo = SERVOS[bottom_servo_id]['servo']
+
+        print(f"\nMoving {leg_name} leg.")
+
+        # Lift the leg
+        print(f"Lifting {leg_name} leg.")
+        lift_up_angle = SERVOS[top_servo_id]['lift_up']
+        top_servo.move(lift_up_angle)
+        print(f"Top Servo {top_servo_id} moved to {lift_up_angle}°")
+        input("\nPress Enter to proceed to the next movement...")
+
+        # Swing the leg forward
+        print(f"Swinging {leg_name} leg forward.")
+        swing_forward_angle = SERVOS[bottom_servo_id]['swing_forward']
+        bottom_servo.move(swing_forward_angle)
+        print(f"Bottom Servo {bottom_servo_id} moved to {swing_forward_angle}°")
+        input("\nPress Enter to proceed to the next movement...")
+
+        # Lower the leg
+        print(f"Lowering {leg_name} leg.")
+        lift_down_angle = SERVOS[top_servo_id]['lift_down']
+        top_servo.move(lift_down_angle)
+        print(f"Top Servo {top_servo_id} moved to {lift_down_angle}°")
+        input("\nPress Enter to proceed to the next movement...")
+
+    print("Step-by-step walking mode completed.")
+
 def main():
     boot_sequence()
     homing_sequence()
@@ -302,8 +348,9 @@ def main():
         print("1. Start Walking")
         print("2. Fine-Tune Front Left Leg")
         print("3. Exit")
+        print("4. Walk Step-by-Step")
         try:
-            choice = input("Enter your choice (1/2/3): ").strip()
+            choice = input("Enter your choice (1/2/3/4): ").strip()
         except EOFError:
             print("\nEOF detected. Exiting program.")
             homing_sequence()
@@ -356,8 +403,13 @@ def main():
             print("Program terminated gracefully.")
             break
 
+        elif choice == '4':
+            walk_step_by_step()
+            homing_sequence()  # Return to home position after completion
+            print("Step-by-step walking mode terminated gracefully.")
+
         else:
-            print("Invalid choice. Please enter 1, 2, or 3.")
+            print("Invalid choice. Please enter 1, 2, 3, or 4.")
 
 if __name__ == "__main__":
     main()
