@@ -12,17 +12,70 @@ LX16A.initialize("/dev/cu.usbserial-130", 0.1)  # macOS
 # Servo configuration: ID and angle limits
 # Note: Adjust 'swing_backward', 'swing_forward', 'lift_down', and 'lift_up' as per your robot's design
 SERVOS = {
-    1: {"name": "Back Left Bottom", "min_angle": 159.0, "max_angle": 210.0, "swing_backward": 210.0, "swing_forward": 160.0},
-    2: {"name": "Back Left Top", "min_angle": 129.0, "max_angle": 135.0, "lift_down": 130.0, "lift_up": 135.0},  # Updated lift_up
-
-    3: {"name": "Front Left Bottom", "min_angle": 150.0, "max_angle": 201.0, "swing_backward": 150.0, "swing_forward": 200.0},
-    4: {"name": "Front Left Top", "min_angle": 159.0, "max_angle": 165.0, "lift_down": 160.0, "lift_up": 165.0},    # Updated lift_up
-
-    5: {"name": "Front Right Bottom", "min_angle": 150.0, "max_angle": 205.0, "swing_backward": 150.0, "swing_forward": 200.0},  # Corrected swing_forward
-    6: {"name": "Front Right Top", "min_angle": 95.0, "max_angle": 105.0, "lift_down": 100.0, "lift_up": 105.0},  # Updated lift_up
-
-    7: {"name": "Back Right Bottom", "min_angle": 130.0, "max_angle": 180.0, "swing_backward": 180.0, "swing_forward": 130.0},
-    8: {"name": "Back Right Top", "min_angle": 69.0, "max_angle": 75.0, "lift_down": 70.0, "lift_up": 75.0},      # Updated lift_up
+    1: {
+        "name": "Back Left Bottom",
+        "min_angle": 160.0,
+        "max_angle": 210.0,
+        "neutral_angle": 185.0,
+        "swing_forward": 150.1,   # Higher angle for back servos to swing forward - 210.0
+        "swing_backward": 185.1    # Slightly above min_angle to prevent limit breach - 160.1
+    },
+    2: {
+        "name": "Back Left Top",
+        "min_angle": 105.0,
+        "max_angle": 135.0,
+        "neutral_angle": 125.0,
+        "lift_down": 115.9,        # Slightly above min_angle
+        "lift_up": 125.1           # Slightly below max_angle
+    },
+    3: {
+        "name": "Front Left Bottom",
+        "min_angle": 130.0,
+        "max_angle": 220.0,
+        "neutral_angle": 210.0,
+        "swing_forward": 180.0,    # Lower angle for front servos to swing forward
+        "swing_backward": 210.82    # Slightly below max_angle to prevent limit breach
+    },
+    4: {
+        "name": "Front Left Top",
+        "min_angle": 130.0,
+        "max_angle": 180.0,
+        "neutral_angle": 125.0,    # Centered neutral position
+        "lift_down": 140.8,         # Slightly below max_angle
+        "lift_up": 125.1           # Slightly above min_angle (inverted)
+    },
+    5: {
+        "name": "Front Right Bottom",
+        "min_angle": 150.0,
+        "max_angle": 199.92,
+        "neutral_angle": 170.0,
+        "swing_forward": 199.82,    # Lower angle for front servos to swing forward - 150.0
+        "swing_backward": 170.0    # Slightly below max_angle to prevent limit breach - 199.82
+    },
+    6: {
+        "name": "Front Right Top",
+        "min_angle": 75.0,
+        "max_angle": 135.0,
+        "neutral_angle": 100.0,
+        "lift_down": 90.78 ,        # Slightly above min_angle
+        "lift_up": 100.1          # Slightly below max_angle
+    },
+    7: {
+        "name": "Back Right Bottom",
+        "min_angle": 130.0,
+        "max_angle": 179.76,
+        "neutral_angle": 170.0,
+        "swing_forward": 150.66,   # Higher angle for back servos to swing forward
+        "swing_backward": 170.1     # Slightly above min_angle to prevent limit breach
+    },
+    8: {
+        "name": "Back Right Top",
+        "min_angle": 60.0,
+        "max_angle": 90.0,
+        "neutral_angle": 65.0,
+        "lift_down": 80.1,          # Slightly above min_angle
+        "lift_up": 65.78            # Slightly below max_angle
+    },
 }
 
 GROUP_A = [3, 4, 7, 8]  # Front Left and Back Right
